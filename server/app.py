@@ -54,48 +54,39 @@ async def root():
 async def chat_options():
     return JSONResponse(content={}, status_code=200)
 
-@app.post("/chat")
-async def chat_with_llm(request: Request):
-    body = await request.json()
-    message = body.get("message")
-
-    if not message:
-        raise HTTPException(status_code=400, detail="Message is required")
-
+@app.post("/chat", response_model=ChatResponse)
+async def chat_with_llm(request: ChatRequest):
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {API_KEY}"
     }
-    logger.info(f"Received message: {message}")
+    logger.info(f"Received message: {request.message}")
     payload = {
-        "messages": [{"role": "user", "content": message}],
-        "stream": True
+        "messages": [{"role": "user", "content": request.message}]
     }
     logger.info(f"Payload: {payload}")
-
-    async def event_stream():
-        async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient() as client:
+        try:
+            logger.info(f"Sending request to LLM endpoint: {LLM_ENDPOINT}")
+            response = await client.post(LLM_ENDPOINT, json=payload, headers=headers, timeout=30.0)
+            response.raise_for_status()
+            logger.info("Received response from LLM")
+            response_data = response.json()
+            logger.info(f"Response data: {response_data}")
             try:
-                logger.info(f"Sending request to LLM endpoint: {LLM_ENDPOINT}")
-                response = await client.post(LLM_ENDPOINT, json=payload, headers=headers, timeout=60.0)
-                response.raise_for_status()
-                logger.info("Received response from LLM")
-                data = response.json()
-                logger.info(f"Received data: {data}")
-                content = data[0]['choices'][0]['message']['content']
-                yield f"data: {json.dumps({'content': content})}\n\n"
-                yield "data: [DONE]\n\n"
-            except httpx.ReadTimeout:
-                logger.error("Read timeout occurred while streaming from LLM")
-                yield f"data: {json.dumps({'error': 'Read timeout occurred'})}\n\n"
-            except httpx.HTTPStatusError as e:
-                logger.error(f"HTTP error occurred: {e}")
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            except Exception as e:
-                logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+                # Extract content from the first choice's message
+                content = response_data['choices'][0]['message']['content']
+                return ChatResponse(content=content)
+            except (KeyError, IndexError, ValidationError) as e:
+                logger.error(f"Failed to process response: {e}")
+                raise HTTPException(status_code=500, detail="Invalid response from LLM endpoint")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error occurred: {e}")
+            logger.error(f"Response content: {e.response.content}")
+            raise HTTPException(status_code=e.response.status_code, detail=str(e))
+        except Exception as e:
+            logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

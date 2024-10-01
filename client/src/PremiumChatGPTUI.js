@@ -46,44 +46,9 @@ const PremiumChatBotUI = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
-        setCurrentStreamingMessage("");
-        let fullMessage = "";
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          const decodedChunk = decoder.decode(value, { stream: true });
-          console.log("Received chunk:", decodedChunk); // Debug log
-
-          const lines = decodedChunk.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const jsonData = line.slice(5).trim();
-              console.log("Parsed JSON data:", jsonData); // Debug log
-
-              if (jsonData === '[DONE]') {
-                setIsLoading(false);
-                setMessages(prevMessages => [...prevMessages, { text: fullMessage, sender: "bot" }]);
-                break;
-              }
-
-              try {
-                const data = JSON.parse(jsonData);
-                if (data.content) {
-                  fullMessage += data.content;
-                  setCurrentStreamingMessage(fullMessage);
-                } else if (data.error) {
-                  throw new Error(data.error);
-                }
-              } catch (error) {
-                console.error('Error parsing JSON:', error);
-              }
-            }
-          }
-        }
+        const data = await response.json();
+        setMessages(prevMessages => [...prevMessages, { text: data.content, sender: "bot" }]);
+        setIsLoading(false);
       } catch (error) {
         console.error('Error:', error);
         setMessages((prevMessages) => [

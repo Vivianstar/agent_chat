@@ -68,14 +68,14 @@ async def chat_with_llm(request: ChatRequest):
     async with httpx.AsyncClient() as client:
         try:
             logger.info(f"Sending request to LLM endpoint: {LLM_ENDPOINT}")
-            response = await client.post(LLM_ENDPOINT, json=payload, headers=headers, timeout=30.0)
+            response = await client.post(LLM_ENDPOINT, json=payload, headers=headers, timeout=90.0)
             response.raise_for_status()
             logger.info("Received response from LLM")
             response_data = response.json()
             logger.info(f"Response data: {response_data}")
             try:
                 # Extract content from the first choice's message
-                content = response_data['choices'][0]['message']['content']
+                content = response_data[0]['choices'][0]['message']['content']
                 return ChatResponse(content=content)
             except (KeyError, IndexError, ValidationError) as e:
                 logger.error(f"Failed to process response: {e}")

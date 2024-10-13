@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
+import ReactMarkdown from 'react-markdown';
 import {
   PlusIcon,
   SendIcon,
   UserIcon,
   BotIcon,
   ChevronDownIcon,
+  ThumbsUpIcon,
+  ThumbsDownIcon,
+  CopyIcon,
 } from "lucide-react";
 
 const PremiumChatBotUI = () => {
@@ -20,6 +24,7 @@ const PremiumChatBotUI = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentStreamingMessage, setCurrentStreamingMessage] = useState("");
   const eventSourceRef = useRef(null);
+  const [feedback, setFeedback] = useState({});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -85,6 +90,24 @@ const PremiumChatBotUI = () => {
     };
   }, []);
 
+  const handleFeedback = (messageIndex, isPositive) => {
+    setFeedback(prev => ({
+      ...prev,
+      [messageIndex]: isPositive
+    }));
+    // Here you would typically send this feedback to your backend
+    console.log(`Feedback for message ${messageIndex}: ${isPositive ? 'positive' : 'negative'}`);
+  };
+
+  const handleCopyMessage = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      // Optionally, you can show a brief notification that the text was copied
+      console.log('Text copied to clipboard');
+    }, (err) => {
+      console.error('Could not copy text: ', err);
+    });
+  };
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-gray-100 font-sans">
       {/* Sidebar */}
@@ -122,14 +145,39 @@ const PremiumChatBotUI = () => {
               <div
                 className={`max-w-2xl p-4 rounded-2xl ${
                   message.sender === "user"
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                    ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white pt-3 pb-1 px-6 flex items-center"
                     : "bg-gray-800 bg-opacity-50 text-gray-100"
-                } shadow-xl flex items-start`}
+                } shadow-xl flex`}
               >
                 {message.sender === "bot" && (
                   <BotIcon className="w-5 h-5 mr-3 mt-1 text-purple-400" />
                 )}
-                <p className="text-sm leading-relaxed">{message.text}</p>
+                <div className="markdown-content">
+                  <ReactMarkdown>{message.text}</ReactMarkdown>
+                  {message.sender === "bot" && (
+                    <div className="mt-2 flex justify-end space-x-2">
+                      <button
+                        onClick={() => handleCopyMessage(message.text)}
+                        className="p-1 rounded-full bg-gray-700 hover:bg-gray-600"
+                        title="Copy message"
+                      >
+                        <CopyIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(index, true)}
+                        className={`p-1 rounded-full ${feedback[index] === true ? 'bg-green-500' : 'bg-gray-700 hover:bg-gray-600'}`}
+                      >
+                        <ThumbsUpIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(index, false)}
+                        className={`p-1 rounded-full ${feedback[index] === false ? 'bg-red-500' : 'bg-gray-700 hover:bg-gray-600'}`}
+                      >
+                        <ThumbsDownIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}

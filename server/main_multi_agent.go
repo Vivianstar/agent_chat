@@ -44,7 +44,7 @@ func init() {
 		log.Fatal("Error loading .env file")
 	}
 
-	llmEndpoint = os.Getenv("AGENT_ENDPOINT")
+	llmEndpoint = os.Getenv("MULTI_AGENT_ENDPOINT")
 	apiKey = os.Getenv("DATABRICKS_TOKEN")
 
 	if llmEndpoint == "" || apiKey == "" {
@@ -74,7 +74,7 @@ func main() {
 	r.POST("/chat", chatWithLLM)
 
 	log.Println("Starting the server...")
-	if err := r.Run(":8000"); err != nil {
+	if err := r.Run(":8001"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -127,7 +127,6 @@ func chatWithLLM(c *gin.Context) {
 		c.JSON(resp.StatusCode, gin.H{"error": "Error from LLM endpoint"})
 		return
 	}
-
 
 	var llmResp []LLMResponse
 	if err := json.NewDecoder(resp.Body).Decode(&llmResp); err != nil {

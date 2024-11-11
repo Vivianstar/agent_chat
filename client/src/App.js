@@ -1,6 +1,6 @@
 import "./App.css";
 import "./index.css";
-import PremiumChatGPTUI from "./PremiumChatGPTUI";
+import PremiumChatGPTUI from "./PremiumChatBot";
 function App() {
   return <PremiumChatGPTUI />;
 }

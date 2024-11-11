@@ -10,6 +10,7 @@ import {
   ThumbsDownIcon,
   CopyIcon,
 } from "lucide-react";
+import MapView from './MapView';
 
 const PremiumChatBotUI = () => {
   const [conversations, setConversations] = useState([
@@ -22,9 +23,8 @@ const PremiumChatBotUI = () => {
   const [inputMessage, setInputMessage] = useState("");
   const messagesEndRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentStreamingMessage, setCurrentStreamingMessage] = useState("");
-  const eventSourceRef = useRef(null);
   const [feedback, setFeedback] = useState({});
+  const initialized = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,27 +68,7 @@ const PremiumChatBotUI = () => {
     }
   };
 
-  useEffect(() => {
-    if (currentStreamingMessage) {
-      setMessages((prevMessages) => {
-        const newMessages = [...prevMessages];
-        if (newMessages[newMessages.length - 1]?.sender === "bot") {
-          newMessages[newMessages.length - 1].text = currentStreamingMessage;
-        } else {
-          newMessages.push({ text: currentStreamingMessage, sender: "bot" });
-        }
-        return newMessages;
-      });
-    }
-  }, [currentStreamingMessage]);
 
-  useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, []);
 
   const handleFeedback = (messageIndex, isPositive) => {
     setFeedback(prev => ({
@@ -107,6 +87,139 @@ const PremiumChatBotUI = () => {
       console.error('Could not copy text: ', err);
     });
   };
+
+  const extractAllCoordinates = (text) => {
+    if (!text) return [];
+    
+    // Regular expression to match all coordinate pairs in the format
+    const coordRegex = /Location:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/g;
+    const coordinates = [];
+    
+    let match;
+    while ((match = coordRegex.exec(text)) !== null) {
+      const lat = parseFloat(match[1]);
+      const lng = parseFloat(match[2]);
+      coordinates.push([lat, lng]);
+    }
+    
+    return coordinates;
+  };
+
+  const renderMessage = (message, index) => {
+    const coordinates = message.sender === "bot" ? extractAllCoordinates(message.text) : null;
+    
+    return (
+      <div
+        key={index}
+        className={`flex ${
+          message.sender === "user" ? "justify-end" : "justify-start"
+        } animate-fadeIn`}
+      >
+        <div
+          className={`max-w-2xl p-4 rounded-2xl ${
+            message.sender === "user"
+              ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white pt-3 pb-1 px-6 flex items-center"
+              : "bg-gray-800 bg-opacity-50 text-gray-100"
+          } shadow-xl flex`}
+        >
+          {message.sender === "bot" && (
+            <BotIcon className="w-5 h-5 mr-3 mt-1 text-purple-400" />
+          )}
+          <div className="markdown-content">
+            <ReactMarkdown>{message.text}</ReactMarkdown>
+            
+            {coordinates && coordinates.length > 0 && (
+              <MapView coordinates={coordinates} />
+            )}
+
+            {message.sender === "bot" && (
+              <div className="mt-2 flex justify-end space-x-2">
+                <button
+                  onClick={() => handleCopyMessage(message.text)}
+                  className="p-1 rounded-full bg-gray-700 hover:bg-gray-600"
+                  title="Copy message"
+                >
+                  <CopyIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleFeedback(index, true)}
+                  className={`p-1 rounded-full ${feedback[index] === true ? 'bg-green-500' : 'bg-gray-700 hover:bg-gray-600'}`}
+                >
+                  <ThumbsUpIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleFeedback(index, false)}
+                  className={`p-1 rounded-full ${feedback[index] === false ? 'bg-red-500' : 'bg-gray-700 hover:bg-gray-600'}`}
+                >
+                  <ThumbsDownIcon className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Function to add messages with delay and simulate movement
+  const initializeMessages = async () => {
+    // Define cities with their coordinates
+    const cities = [
+      {
+        user: "Find me the vehicle statuses within 5 miles of location 1669 Euclid Ave, Boulder, CO 80309",
+        bot: `Here are the vehicle statuses within 5 miles of 1669 Euclid Ave, Boulder, CO 80309:
+
+              1. Vehicle ID: 100905
+                - Location: 40.00666427612305, -105.28015899658203
+                - Heading: 226
+                - Onboard quantity: 1000
+                - Speed: 11.384
+                - Last reported timestamp: 2024-10-01T09:35:18.000Z
+
+              2. Vehicle ID: 100258
+                - Location: 40.04490661621094, -105.26258850097656
+                - Heading: 166
+                - Onboard quantity: 1364
+                - Speed: 7.3385
+                - Last reported timestamp: 2024-10-01T09:39:21.000Z
+
+              3. Vehicle ID: 100492
+                - Location: 40.04677200317383, -105.26612854003906
+                - Heading: 302
+                - Onboard quantity: 967
+                - Speed: 25.5408
+                - Last reported timestamp: 2024-10-01T09:39:11.000Z
+
+              4. Vehicle ID: 100401
+                - Location: 39.96257781982422, -105.2577133178711
+                - Heading: 266
+                - Onboard quantity: 809
+                - Speed: 34.6396
+                - Last reported timestamp: 2024-10-01T09:05:52.000Z`
+      }
+    ];
+
+    // Add each city with a delay
+    for (let i = 0; i < cities.length; i++) {
+      const city = cities[i];
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced delay to 1 second
+      
+      setMessages(prev => [
+        ...prev,
+        { sender: "user", text: city.user },
+        { sender: "bot", text: city.bot }
+      ]);
+
+    }
+  };
+
+  // Call the initialization function when component mounts
+  useEffect(() => {
+    if (!initialized.current) {
+      initialized.current = true;
+      initializeMessages();
+    }
+  }, []);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-gray-100 font-sans">
@@ -135,52 +248,7 @@ const PremiumChatBotUI = () => {
       <div className="flex-1 flex flex-col bg-black bg-opacity-50 backdrop-filter backdrop-blur-md">
         {/* Messages */}
         <div className="flex-grow overflow-y-auto p-8 space-y-6 custom-scrollbar">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${
-                message.sender === "user" ? "justify-end" : "justify-start"
-              } animate-fadeIn`}
-            >
-              <div
-                className={`max-w-2xl p-4 rounded-2xl ${
-                  message.sender === "user"
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white pt-3 pb-1 px-6 flex items-center"
-                    : "bg-gray-800 bg-opacity-50 text-gray-100"
-                } shadow-xl flex`}
-              >
-                {message.sender === "bot" && (
-                  <BotIcon className="w-5 h-5 mr-3 mt-1 text-purple-400" />
-                )}
-                <div className="markdown-content">
-                  <ReactMarkdown>{message.text}</ReactMarkdown>
-                  {message.sender === "bot" && (
-                    <div className="mt-2 flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleCopyMessage(message.text)}
-                        className="p-1 rounded-full bg-gray-700 hover:bg-gray-600"
-                        title="Copy message"
-                      >
-                        <CopyIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleFeedback(index, true)}
-                        className={`p-1 rounded-full ${feedback[index] === true ? 'bg-green-500' : 'bg-gray-700 hover:bg-gray-600'}`}
-                      >
-                        <ThumbsUpIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleFeedback(index, false)}
-                        className={`p-1 rounded-full ${feedback[index] === false ? 'bg-red-500' : 'bg-gray-700 hover:bg-gray-600'}`}
-                      >
-                        <ThumbsDownIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+          {messages.map((message, index) => renderMessage(message, index))}
           {isLoading && (
             <div className="flex justify-center items-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>

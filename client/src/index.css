@@ -58,6 +58,19 @@ code {
 .markdown-content code {
   font-family: monospace;
   background-color: rgba(0, 0, 0, 0.1);
-  padding: 2px 4px;
+  padding: 1px 1px;
   border-radius: 2px;
+}
+/* Add these styles for Mapbox */
+.mapboxgl-ctrl-logo {
+  display: none !important;
+}
+
+.mapboxgl-ctrl-bottom-right {
+  display: none !important;
+}
+
+.mapboxgl-ctrl-top-right {
+  top: 12px !important;
+  right: 12px !important;
 }

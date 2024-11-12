@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import './index.css';
 
 // Set your Mapbox token
-mapboxgl.accessToken = "";
+mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
 
 const carSvg = `
 <svg width="32" height="32" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -73,8 +73,12 @@ const MapView = ({ vehicles }) => {
       if (route.progress >= 1) {
         // Remove completed route
         if (route.line) {
-          map.current.removeLayer(route.line);
-          map.current.removeSource(route.line);
+          if (map.current.getLayer(route.line)) {
+            map.current.removeLayer(route.line);
+          }
+          if (map.current.getSource(route.line)) {
+            map.current.removeSource(route.line);
+          }
         }
         activeRoutes.current.splice(index, 1);
         return;
@@ -111,6 +115,9 @@ const MapView = ({ vehicles }) => {
       center: [-105.2705, 40.0150],
       zoom: 12
     });
+
+    // Add navigation control (zoom in/out)
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
     // Wait for map to load before adding click handler
     map.current.on('load', () => {
@@ -249,6 +256,39 @@ const MapView = ({ vehicles }) => {
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
+
+  const simulateVehicleMovement = (vehicleId, direction) => {
+    const markerData = markersRef.current[vehicleId];
+    if (!markerData) return;
+
+    const { marker, currentPosition } = markerData;
+    const speed = 0.00001; // Adjust speed as needed
+
+    const newPos = [
+      currentPosition[0] + direction[0] * speed,
+      currentPosition[1] + direction[1] * speed
+    ];
+
+    marker.setLngLat(newPos);
+
+    // Update the current position to the new location
+    markerData.currentPosition = newPos;
+  };
+
+  // Example usage: Move each vehicle in a specific direction
+  const directions = vehicles.map(() => {
+    // Generate a random direction vector for each vehicle
+    const angle = -Math.random() * 2 * Math.PI;
+    return [Math.cos(angle), Math.sin(angle)];
+  });
+
+  setInterval(() => {
+    vehicles.forEach((vehicle, index) => {
+      if (vehicle && vehicle.location) {
+        simulateVehicleMovement(vehicle.id, directions[index]);
+      }
+    });
+  }, 100); // Update every 100 milliseconds
 
   return (
     <div 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import './index.css';
@@ -6,7 +6,6 @@ import './index.css';
 // Set your Mapbox token
 mapboxgl.accessToken = "";
 
-// Replace the existing carSvg with this new one
 const carSvg = `
 <svg width="32" height="32" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
   <g transform="translate(0,20)">
@@ -22,196 +21,157 @@ const carSvg = `
 const MapView = ({ vehicles }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
-  const markers = useRef([]);
+  const markersRef = useRef({});
 
-  useEffect(() => {
-    if (!mapContainer.current || !vehicles || vehicles.length === 0) return;
+  const createMarker = (vehicle) => {
+    const el = document.createElement('div');
+    el.className = 'vehicle-marker';
+    el.innerHTML = carSvg;
 
-    // Calculate center point using vehicle locations
-    const center = vehicles.reduce(
-      (acc, curr) => [acc[0] + curr.location[0]/vehicles.length, acc[1] + curr.location[1]/vehicles.length],
-      [0, 0]
-    );
-
-    try {
-      // Initialize map only once
-      if (!map.current) {
-        const mapInstance = new mapboxgl.Map({
-          container: mapContainer.current,
-          style: 'mapbox://styles/mapbox/streets-v12',
-          center: [center[1], center[0]],
-          zoom: 11.5,
-          pitch: 45,
-          bearing: 0,
-          antialias: true
-        });
-
-        map.current = mapInstance;
-
-        // Wait for map to load before adding layers and markers
-        mapInstance.on('load', () => {
-          // Add 3D building layer
-          mapInstance.addLayer({
-            'id': '3d-buildings',
-            'source': 'composite',
-            'source-layer': 'building',
-            'filter': ['==', 'extrude', 'true'],
-            'type': 'fill-extrusion',
-            'minzoom': 15,
-            'paint': {
-              'fill-extrusion-color': '#aaa',
-              'fill-extrusion-height': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                15,
-                0,
-                15.05,
-                ['get', 'height']
-              ],
-              'fill-extrusion-base': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                15,
-                0,
-                15.05,
-                ['get', 'min_height']
-              ],
-              'fill-extrusion-opacity': 0.6
-            }
-          });
-
-          // Add markers for all vehicles
-          vehicles.forEach((vehicle) => {
-            const marker = createMarker()
-              .setLngLat([vehicle.location[1], vehicle.location[0]])
-              .addTo(mapInstance);
-
-            markers.current.push(marker);
-
-            const popup = new mapboxgl.Popup({ 
-              offset: 25,
-              closeButton: false,
-              className: 'custom-popup'
-            })
-            .setHTML(`
-              <div style="
-                padding: 8px; 
-                font-family: inherit; 
-                font-size: 12px; 
-                color: #1a1a1a;
-                line-height: 1.2;
-                white-space: nowrap;
-              ">
-                <h3 style="
-                  margin: 0 0 4px 0; 
-                  font-size: 13px; 
-                  font-weight: 600;
-                ">Vehicle ${vehicle.id}</h3>
-                <p style="margin: 0 0 2px 0;">Heading: ${vehicle.heading}°</p>
-              </div>
-            `);
-
-            marker.setPopup(popup);
-          });
-        });
-
-        // Add navigation controls
-        mapInstance.addControl(new mapboxgl.NavigationControl());
-      } else {
-        // Update existing markers
-        markers.current.forEach(marker => marker.remove());
-        markers.current = [];
-
-        vehicles.forEach((vehicle) => {
-          const marker = createMarker()
-            .setLngLat([vehicle.location[1], vehicle.location[0]])
-            .addTo(map.current);
-
-          const popup = new mapboxgl.Popup({ 
-            offset: 25,
-            closeButton: false,
-            className: 'custom-popup'
-          })
-          .setHTML(`
-            <div style="
-                padding: 8px; 
-                font-family: inherit; 
-                font-size: 12px; 
-                color: #1a1a1a;
-                line-height: 1.2;
-                white-space: nowrap;
-              ">
-                <h3 style="
-                  margin: 0 0 4px 0; 
-                  font-size: 13px; 
-                  font-weight: 600;
-                ">Vehicle ${vehicle.id}</h3>
-                <p style="margin: 0 0 2px 0;">Heading: ${vehicle.heading}°</p>
-              </div>
-          `);
-
-          marker.setPopup(popup);
-          markers.current.push(marker);
-        });
-
-        // Update map center and zoom to fit all markers
-        const bounds = new mapboxgl.LngLatBounds();
-        vehicles.forEach(vehicle => {
-          bounds.extend([vehicle.location[1], vehicle.location[0]]);
-        });
-
-        map.current.fitBounds(bounds, {
-          padding: 50,
-          duration: 1000
-        });
-      }
-
-    } catch (error) {
-      console.error('Map initialization error:', error);
+    // Make sure location data exists and is valid
+    if (!vehicle.location || !Array.isArray(vehicle.location) || vehicle.location.length !== 2) {
+      console.error('Invalid vehicle location data:', vehicle);
+      return null;
     }
 
-    // Cleanup function
-    return () => {
-      if (markers.current) {
-        markers.current.forEach(marker => marker.remove());
-        markers.current = [];
-      }
-      if (map.current && map.current.remove) {
-        map.current.remove();
-        map.current = null;
-      }
+    const marker = new mapboxgl.Marker({
+      element: el,
+      anchor: 'center'
+    })
+      .setLngLat([vehicle.location[1], vehicle.location[0]])
+      .addTo(map.current);
+
+    // Store marker with additional data
+    markersRef.current[vehicle.id] = {
+      marker,
+      vehicle,
+      currentPosition: [vehicle.location[1], vehicle.location[0]]
     };
+
+    return marker;
+  };
+
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [-105.2705, 40.0150],
+      zoom: 12
+    });
+
+    // Wait for map to load before adding click handler
+    map.current.on('load', () => {
+      map.current.on('click', (e) => {
+        const activeMarkers = Object.values(markersRef.current).filter(m => m && m.marker);
+        
+        if (activeMarkers.length === 0) {
+          console.log('No active markers available');
+          return;
+        }
+
+        // Select random vehicle
+        const randomMarker = activeMarkers[Math.floor(Math.random() * activeMarkers.length)];
+        
+        if (!randomMarker || !randomMarker.marker) {
+          console.error('Invalid marker selected');
+          return;
+        }
+
+        const currentPosition = randomMarker.marker.getLngLat();
+        const clickPosition = e.lngLat;
+
+        // Add destination marker
+        new mapboxgl.Marker({ color: '#ef4444' })
+          .setLngLat(clickPosition)
+          .addTo(map.current);
+
+        // Draw route line
+        if (map.current.getSource('route')) {
+          map.current.removeLayer('route');
+          map.current.removeSource('route');
+        }
+
+        map.current.addSource('route', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [currentPosition.lng, currentPosition.lat],
+                [clickPosition.lng, clickPosition.lat]
+              ]
+            }
+          }
+        });
+
+        map.current.addLayer({
+          id: 'route',
+          type: 'line',
+          source: 'route',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#3b82f6',
+            'line-width': 2,
+            'line-dasharray': [2, 2]
+          }
+        });
+      });
+    });
+
+    return () => {
+      Object.values(markersRef.current).forEach(({ marker }) => {
+        if (marker) marker.remove();
+      });
+      if (map.current) map.current.remove();
+    };
+  }, []);
+
+  // Update markers when vehicles change
+  useEffect(() => {
+    if (!map.current) return;
+
+    // Clear existing markers
+    Object.values(markersRef.current).forEach(({ marker }) => {
+      if (marker) marker.remove();
+    });
+    markersRef.current = {};
+
+    // Add new markers for each vehicle
+    vehicles.forEach(vehicle => {
+      if (vehicle && vehicle.location) {
+        createMarker(vehicle);
+      }
+    });
+
+    // Fit map to show all vehicles
+    if (vehicles.length > 0) {
+      const bounds = new mapboxgl.LngLatBounds();
+      vehicles.forEach(vehicle => {
+        if (vehicle.location) {
+          bounds.extend([vehicle.location[1], vehicle.location[0]]);
+        }
+      });
+      map.current.fitBounds(bounds, { padding: 50 });
+    }
   }, [vehicles]);
 
   return (
     <div 
       ref={mapContainer} 
       style={{ 
-        width: '100%', 
-        height: '400px',
-        position: 'relative',
+        height: '400px', 
         borderRadius: '8px',
-        overflow: 'hidden',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-      }}
+        border: '1px solid #ccc'
+      }} 
     />
   );
-};
-
-// Update the createMarker function to adjust the styling
-const createMarker = () => {
-  const el = document.createElement('div');
-  el.innerHTML = carSvg;
-  el.style.transform = 'rotate(0deg)';
-  el.style.width = '32px';  // Adjust size as needed
-  el.style.height = '32px'; // Adjust size as needed
-  
-  return new mapboxgl.Marker({
-    element: el,
-    anchor: 'center'
-  });
 };
 
 export default MapView;

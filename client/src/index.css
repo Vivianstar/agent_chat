@@ -74,3 +74,15 @@ code {
   top: 12px !important;
   right: 12px !important;
 }
+
+.vehicle-marker {
+  transition: transform 0.3s ease-in-out;
+}
+
+.route-line {
+  stroke: #3b82f6;
+  stroke-width: 2;
+  stroke-dasharray: 5,5;
+  fill: none;
+  opacity: 0.6;
+}

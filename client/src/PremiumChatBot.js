@@ -217,44 +217,7 @@ const PremiumChatBotUI = () => {
         { sender: "bot", text: city.bot }
       ]);
       
-      // Extract initial vehicle data
-      const vehicles = extractAllCoordinates(city.bot);
-      if (vehicles.length > 0) {
-        // Set initial vehicle positions
-        setCurrentLocation(vehicles);
-
-        // Start movement simulation
-        const movementInterval = setInterval(() => {
-          setCurrentLocation(prevVehicles => 
-            prevVehicles.map(vehicle => {
-              // Convert heading to radians for calculation
-              const headingRad = (vehicle.heading || 0) * Math.PI / 180;
-              const speed = vehicle.speed || 0;
-              
-              // Calculate movement based on heading and speed
-              // Speed is converted from mph to a reasonable map movement
-              const speedFactor = speed * 0.001; // Adjust this factor to control movement speed
-              
-              return {
-                ...vehicle,
-                location: [
-                  // Move in heading direction
-                  vehicle.location[0] + (Math.cos(headingRad) * speedFactor),
-                  vehicle.location[1] + (Math.sin(headingRad) * speedFactor)
-                ]
-              };
-            })
-          );
-        }, 1000); // Update every 100ms for smoother movement
-
-        // Store interval ID for cleanup
-        vehicleIntervals.current.push(movementInterval);
-
-        // Optional: Stop movement after some time
-        setTimeout(() => {
-          clearInterval(movementInterval);
-        }, 10000); // Stop after 10 seconds
-      }
+      
     }
   };
 
@@ -266,12 +229,6 @@ const PremiumChatBotUI = () => {
     }
   }, []);
 
-  // Add cleanup when component unmounts
-  useEffect(() => {
-    return () => {
-      vehicleIntervals.current.forEach(interval => clearInterval(interval));
-    };
-  }, []);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-gray-100 font-sans">

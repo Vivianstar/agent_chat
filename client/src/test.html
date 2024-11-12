@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-time Vehicle Tracking</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <style>
+        #map {
+            height: 600px;
+            width: 100%;
+            border-radius: 8px;
+        }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .stats-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div style="position: relative;">
+        <div id="map"></div>
+        <div class="info-panel">
+            <h3 style="margin: 0 0 8px 0;">Real-time Vehicle Tracking</h3>
+            <p style="margin: 0; font-size: 14px;">Click on map to set destination</p>
+        </div>
+        <div class="stats-panel">
+            <div id="stats" style="font-size: 14px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize the map centered on San Francisco
+        const map = L.map('map').setView([37.7749, -122.4194], 13);
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Custom car icon
+        const carIcon = L.divIcon({
+            html: `<div style="color: #2563eb; transform: rotate(0deg);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/>
+                        <circle cx="6.5" cy="16.5" r="2.5"/>
+                        <circle cx="16.5" cy="16.5" r="2.5"/>
+                    </svg>
+                   </div>`,
+            className: 'car-icon',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        // Initial vehicles (with SF coordinates)
+        const vehicles = [
+            {
+                id: 1,
+                marker: L.marker([37.7749, -122.4194], {icon: carIcon}).addTo(map),
+                position: [37.7749, -122.4194]
+            },
+            {
+                id: 2,
+                marker: L.marker([37.7833, -122.4167], {icon: carIcon}).addTo(map),
+                position: [37.7833, -122.4167]
+            }
+        ];
+
+        let destinations = [];
+        let routes = [];
+
+        // Function to calculate new position
+        function moveTowards(start, end, fraction) {
+            return [
+                start[0] + (end[0] - start[0]) * fraction,
+                start[1] + (end[1] - start[1]) * fraction
+            ];
+        }
+
+        // Update stats
+        function updateStats() {
+            document.getElementById('stats').innerHTML = `
+                <div>Active Vehicles: ${vehicles.length}</div>
+                <div>Active Routes: ${routes.length}</div>
+                <div>Pending Destinations: ${destinations.length}</div>
+            `;
+        }
+
+        // Handle map clicks
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            // Add destination marker
+            const destination = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    html: `<div style="color: #ef4444;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                           </div>`,
+                    className: 'destination-icon',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 24]
+                })
+            }).addTo(map);
+            
+            destinations.push({
+                id: Date.now(),
+                marker: destination,
+                position: [lat, lng]
+            });
+
+            // Assign to random vehicle
+            const vehicle = vehicles[Math.floor(Math.random() * vehicles.length)];
+            
+            // Draw route
+            const route = L.polyline([
+                vehicle.position,
+                [lat, lng]
+            ], {
+                color: '#3b82f6',
+                dashArray: '10,10',
+                opacity: 0.6
+            }).addTo(map);
+
+            routes.push({
+                id: Date.now(),
+                path: route,
+                vehicleId: vehicle.id,
+                start: vehicle.position,
+                end: [lat, lng],
+                progress: 0
+            });
+
+            updateStats();
+        });
+
+        // Animation loop
+        let lastTimestamp = 0;
+        function animate(timestamp) {
+            const deltaTime = lastTimestamp ? (timestamp - lastTimestamp) / 1000 : 0;
+            lastTimestamp = timestamp;
+
+            // Update routes and vehicle positions
+            routes.forEach((route, index) => {
+                route.progress += deltaTime * 0.5; // Speed factor
+                
+                if (route.progress >= 1) {
+                    // Remove completed route and destination
+                    map.removeLayer(route.path);
+                    routes.splice(index, 1);
+                    if (destinations.length > 0) {
+                        const dest = destinations.shift();
+                        map.removeLayer(dest.marker);
+                    }
+                    updateStats();
+                    return;
+                }
+
+                // Move vehicle
+                const vehicle = vehicles.find(v => v.id === route.vehicleId);
+                if (vehicle) {
+                    const newPos = moveTowards(route.start, route.end, route.progress);
+                    vehicle.position = newPos;
+                    vehicle.marker.setLatLng(newPos);
+
+                    // Calculate rotation
+                    const dx = route.end[1] - route.start[1];
+                    const dy = route.end[0] - route.start[0];
+                    const rotation = Math.atan2(dx, dy) * (180 / Math.PI);
+                    
+                    // Update car icon rotation
+                    const icon = vehicle.marker.getElement();
+                    if (icon) {
+                        icon.querySelector('div').style.transform = `rotate(${rotation}deg)`;
+                    }
+                }
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

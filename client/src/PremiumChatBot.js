@@ -25,6 +25,8 @@ const PremiumChatBotUI = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState({});
   const initialized = useRef(false);
+  const vehicleIntervals = useRef([]);
+  const [currentLocation, setCurrentLocation] = useState([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,22 +93,27 @@ const PremiumChatBotUI = () => {
   const extractAllCoordinates = (text) => {
     if (!text) return [];
     
-    // Regular expression to match all coordinate pairs in the format
-    const coordRegex = /Location:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/g;
-    const coordinates = [];
+    // Basic regex to always capture ID and Location, make everything else optional
+    const coordRegex = /Vehicle ID: (\d+)[\s\S]*?Location: (-?\d+\.?\d*),\s*(-?\d+\.?\d*)(?:[\s\S]*?Heading: (\d+))?(?:[\s\S]*?Onboard quantity: (\d+))?(?:[\s\S]*?Speed: (\d+\.?\d*))?/g;
+    const vehicles = [];
     
     let match;
     while ((match = coordRegex.exec(text)) !== null) {
-      const lat = parseFloat(match[1]);
-      const lng = parseFloat(match[2]);
-      coordinates.push([lat, lng]);
+      vehicles.push({
+        id: match[1],
+        location: [parseFloat(match[2]), parseFloat(match[3])],
+        heading: match[4] ? parseInt(match[4]) : 0,   // Default to 0 if no heading
+        onboardQuantity: match[5] ? parseInt(match[5]) : 0,  // Default to 0 if no quantity
+        speed: match[6] ? parseFloat(match[6]) : 0    // Default to 0 if no speed
+      });
     }
     
-    return coordinates;
+    console.log('Extracted vehicles:', vehicles); // Debug log
+    return vehicles;
   };
 
   const renderMessage = (message, index) => {
-    const coordinates = message.sender === "bot" ? extractAllCoordinates(message.text) : null;
+    const vehicles = message.sender === "bot" ? extractAllCoordinates(message.text) : null;
     
     return (
       <div
@@ -128,8 +135,8 @@ const PremiumChatBotUI = () => {
           <div className="markdown-content">
             <ReactMarkdown>{message.text}</ReactMarkdown>
             
-            {coordinates && coordinates.length > 0 && (
-              <MapView coordinates={coordinates} />
+            {vehicles && vehicles.length > 0 && (
+              <MapView vehicles={vehicles} />
             )}
 
             {message.sender === "bot" && (
@@ -191,7 +198,7 @@ const PremiumChatBotUI = () => {
                 - Last reported timestamp: 2024-10-01T09:39:11.000Z
 
               4. Vehicle ID: 100401
-                - Location: 39.96257781982422, -105.2577133178711
+                - Location: 40.04257781982422, -105.2877133178711
                 - Heading: 266
                 - Onboard quantity: 809
                 - Speed: 34.6396
@@ -209,7 +216,45 @@ const PremiumChatBotUI = () => {
         { sender: "user", text: city.user },
         { sender: "bot", text: city.bot }
       ]);
+      
+      // Extract initial vehicle data
+      const vehicles = extractAllCoordinates(city.bot);
+      if (vehicles.length > 0) {
+        // Set initial vehicle positions
+        setCurrentLocation(vehicles);
 
+        // Start movement simulation
+        const movementInterval = setInterval(() => {
+          setCurrentLocation(prevVehicles => 
+            prevVehicles.map(vehicle => {
+              // Convert heading to radians for calculation
+              const headingRad = (vehicle.heading || 0) * Math.PI / 180;
+              const speed = vehicle.speed || 0;
+              
+              // Calculate movement based on heading and speed
+              // Speed is converted from mph to a reasonable map movement
+              const speedFactor = speed * 0.001; // Adjust this factor to control movement speed
+              
+              return {
+                ...vehicle,
+                location: [
+                  // Move in heading direction
+                  vehicle.location[0] + (Math.cos(headingRad) * speedFactor),
+                  vehicle.location[1] + (Math.sin(headingRad) * speedFactor)
+                ]
+              };
+            })
+          );
+        }, 1000); // Update every 100ms for smoother movement
+
+        // Store interval ID for cleanup
+        vehicleIntervals.current.push(movementInterval);
+
+        // Optional: Stop movement after some time
+        setTimeout(() => {
+          clearInterval(movementInterval);
+        }, 10000); // Stop after 10 seconds
+      }
     }
   };
 
@@ -219,6 +264,13 @@ const PremiumChatBotUI = () => {
       initialized.current = true;
       initializeMessages();
     }
+  }, []);
+
+  // Add cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      vehicleIntervals.current.forEach(interval => clearInterval(interval));
+    };
   }, []);
 
   return (

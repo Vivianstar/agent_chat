@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import './index.css';
 
 // Set your Mapbox token
-mapboxgl.accessToken = ""
+mapboxgl.accessToken = "";
 
 // Replace the existing carSvg with this new one
 const carSvg = `
@@ -19,17 +19,17 @@ const carSvg = `
 </svg>
 `;
 
-const MapView = ({ coordinates }) => {
+const MapView = ({ vehicles }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const markers = useRef([]);
 
   useEffect(() => {
-    if (!mapContainer.current || !coordinates || coordinates.length === 0) return;
+    if (!mapContainer.current || !vehicles || vehicles.length === 0) return;
 
-    // Calculate center point of all coordinates
-    const center = coordinates.reduce(
-      (acc, curr) => [acc[0] + curr[0]/coordinates.length, acc[1] + curr[1]/coordinates.length],
+    // Calculate center point using vehicle locations
+    const center = vehicles.reduce(
+      (acc, curr) => [acc[0] + curr.location[0]/vehicles.length, acc[1] + curr.location[1]/vehicles.length],
       [0, 0]
     );
 
@@ -39,8 +39,8 @@ const MapView = ({ coordinates }) => {
         const mapInstance = new mapboxgl.Map({
           container: mapContainer.current,
           style: 'mapbox://styles/mapbox/streets-v12',
-          center: [center[1], center[0]], // [lng, lat]
-          zoom: 12,
+          center: [center[1], center[0]],
+          zoom: 11.5,
           pitch: 45,
           bearing: 0,
           antialias: true
@@ -82,25 +82,36 @@ const MapView = ({ coordinates }) => {
             }
           });
 
-          // Add markers for all coordinates
-          coordinates.forEach((coord, index) => {
+          // Add markers for all vehicles
+          vehicles.forEach((vehicle) => {
             const marker = createMarker()
-              .setLngLat([coord[1], coord[0]])
+              .setLngLat([vehicle.location[1], vehicle.location[0]])
               .addTo(mapInstance);
 
-            // Store the marker reference
             markers.current.push(marker);
 
-            // Add popup with vehicle information
-            const popup = new mapboxgl.Popup({ offset: 25 })
-              .setHTML(`
-                <div style="font-family: inherit; font-size: 14px; color: #1a1a1a;">
-                  <h3 style="margin: 0 0 8px 0; font-size: 14px;">Vehicle ${coord.vehicleId || 'Unknown'}</h3>
-                  <p style="margin: 0 0 4px 0;">Heading: ${coord.heading || 0}°</p>
-                  <p style="margin: 0 0 4px 0;">Speed: ${(coord.speed || 0).toFixed(2)} mph</p>
-                  <p style="margin: 0;">Onboard: ${coord.onboardQuantity || 0}</p>
-                </div>
-              `);
+            const popup = new mapboxgl.Popup({ 
+              offset: 25,
+              closeButton: false,
+              className: 'custom-popup'
+            })
+            .setHTML(`
+              <div style="
+                padding: 8px; 
+                font-family: inherit; 
+                font-size: 12px; 
+                color: #1a1a1a;
+                line-height: 1.2;
+                white-space: nowrap;
+              ">
+                <h3 style="
+                  margin: 0 0 4px 0; 
+                  font-size: 13px; 
+                  font-weight: 600;
+                ">Vehicle ${vehicle.id}</h3>
+                <p style="margin: 0 0 2px 0;">Heading: ${vehicle.heading}°</p>
+              </div>
+            `);
 
             marker.setPopup(popup);
           });
@@ -113,20 +124,33 @@ const MapView = ({ coordinates }) => {
         markers.current.forEach(marker => marker.remove());
         markers.current = [];
 
-        coordinates.forEach((coord, index) => {
+        vehicles.forEach((vehicle) => {
           const marker = createMarker()
-            .setLngLat([coord[1], coord[0]])
+            .setLngLat([vehicle.location[1], vehicle.location[0]])
             .addTo(map.current);
 
-          const popup = new mapboxgl.Popup({ offset: 25 })
-            .setHTML(`
-              <div style="font-family: inherit; font-size: 14px;">
-                <h3 style="margin: 0 0 8px 0; font-size: 14px;">Vehicle ${coord.vehicleId || 'Unknown'}</h3>
-                <p style="margin: 0 0 4px 0;">Heading: ${coord.heading || 0}°</p>
-                <p style="margin: 0 0 4px 0;">Speed: ${(coord.speed || 0).toFixed(2)} mph</p>
-                <p style="margin: 0;">Onboard: ${coord.onboardQuantity || 0}</p>
+          const popup = new mapboxgl.Popup({ 
+            offset: 25,
+            closeButton: false,
+            className: 'custom-popup'
+          })
+          .setHTML(`
+            <div style="
+                padding: 8px; 
+                font-family: inherit; 
+                font-size: 12px; 
+                color: #1a1a1a;
+                line-height: 1.2;
+                white-space: nowrap;
+              ">
+                <h3 style="
+                  margin: 0 0 4px 0; 
+                  font-size: 13px; 
+                  font-weight: 600;
+                ">Vehicle ${vehicle.id}</h3>
+                <p style="margin: 0 0 2px 0;">Heading: ${vehicle.heading}°</p>
               </div>
-            `);
+          `);
 
           marker.setPopup(popup);
           markers.current.push(marker);
@@ -134,8 +158,8 @@ const MapView = ({ coordinates }) => {
 
         // Update map center and zoom to fit all markers
         const bounds = new mapboxgl.LngLatBounds();
-        coordinates.forEach(coord => {
-          bounds.extend([coord[1], coord[0]]);
+        vehicles.forEach(vehicle => {
+          bounds.extend([vehicle.location[1], vehicle.location[0]]);
         });
 
         map.current.fitBounds(bounds, {
@@ -159,7 +183,7 @@ const MapView = ({ coordinates }) => {
         map.current = null;
       }
     };
-  }, [coordinates]);
+  }, [vehicles]);
 
   return (
     <div 

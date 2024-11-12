@@ -18,10 +18,20 @@ const carSvg = `
 </svg>
 `;
 
+// Add these helper functions at the top of your component
+const moveTowards = (start, end, fraction) => {
+  return [
+    start[0] + (end[0] - start[0]) * fraction,
+    start[1] + (end[1] - start[1]) * fraction
+  ];
+};
+
 const MapView = ({ vehicles }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const markersRef = useRef({});
+  const animationFrameId = useRef(null);
+  const activeRoutes = useRef([]);
 
   const createMarker = (vehicle) => {
     const el = document.createElement('div');
@@ -49,6 +59,47 @@ const MapView = ({ vehicles }) => {
     };
 
     return marker;
+  };
+
+  const animate = (timestamp) => {
+    if (!activeRoutes.current.length) {
+      animationFrameId.current = null;
+      return;
+    }
+
+    activeRoutes.current.forEach((route, index) => {
+      route.progress += 0.005; // Adjust speed as needed
+
+      if (route.progress >= 1) {
+        // Remove completed route
+        if (route.line) {
+          map.current.removeLayer(route.line);
+          map.current.removeSource(route.line);
+        }
+        activeRoutes.current.splice(index, 1);
+        return;
+      }
+
+      // Move marker
+      const marker = markersRef.current[route.vehicleId]?.marker;
+      if (marker) {
+        const newPos = moveTowards(
+          [route.start.lng, route.start.lat],
+          [route.end.lng, route.end.lat],
+          route.progress
+        );
+        marker.setLngLat(newPos);
+
+        // Calculate and update rotation
+        const dx = route.end.lng - route.start.lng;
+        const dy = route.end.lat - route.start.lat;
+        const rotation = Math.atan2(dx, dy) * (180 / Math.PI);
+        const el = marker.getElement();
+        el.style.transform = `${el.style.transform.replace(/rotate\([^)]*\)/, '')} rotate(${rotation}deg)`;
+      }
+    });
+
+    animationFrameId.current = requestAnimationFrame(animate);
   };
 
   useEffect(() => {
@@ -83,7 +134,7 @@ const MapView = ({ vehicles }) => {
         const clickPosition = e.lngLat;
 
         // Add destination marker
-        new mapboxgl.Marker({ color: '#ef4444' })
+        new mapboxgl.Marker({ color: '#323aa8' })
           .setLngLat(clickPosition)
           .addTo(map.current);
 
@@ -122,6 +173,20 @@ const MapView = ({ vehicles }) => {
             'line-dasharray': [2, 2]
           }
         });
+
+        // Add route to animation queue
+        activeRoutes.current.push({
+          vehicleId: randomMarker.vehicle.id,
+          start: currentPosition,
+          end: clickPosition,
+          progress: 0,
+          line: 'route'
+        });
+
+        // Start animation if not already running
+        if (!animationFrameId.current) {
+          animationFrameId.current = requestAnimationFrame(animate);
+        }
       });
     });
 
@@ -161,6 +226,29 @@ const MapView = ({ vehicles }) => {
       map.current.fitBounds(bounds, { padding: 50 });
     }
   }, [vehicles]);
+
+  // Add cleanup to your existing cleanup function
+  useEffect(() => {
+    // ... existing cleanup ...
+    return () => {
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
+      // ... rest of existing cleanup ...
+    };
+  }, []);
+
+  // Add CSS for smooth transitions
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .vehicle-marker {
+        transition: transform 0.1s ease-out;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
 
   return (
     <div 

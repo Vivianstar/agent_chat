@@ -1,0 +1,19 @@
+build:
+  - name: frontend
+    command: ["bash", "client/build.sh"]
+    
+command:
+  - "uvicorn"
+  - "app:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "${DATABRICKS_APP_PORT}"
+
+env:
+  - name: "AGENT_ENDPOINT"
+    valueFrom: "agent-endpoint"
+  - name: "DATABRICKS_TOKEN"
+    valueFrom: "databricks-token"
+  - name: "REACT_APP_MAPBOX_ACCESS_TOKEN"
+    valueFrom: "mapbox-token"

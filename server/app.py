@@ -3,27 +3,20 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ValidationError
 import httpx
 import os
-from dotenv import load_dotenv
 from typing import Optional, List, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 import json
+from fastapi.staticfiles import StaticFiles
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-try:
-    load_dotenv()
-    LLM_ENDPOINT = os.getenv("AGENT_ENDPOINT")
-    API_KEY = os.getenv("DATABRICKS_TOKEN")
-    if not LLM_ENDPOINT or not API_KEY:
-        raise ValueError("Missing required environment variables")
-except Exception as e:
-    logger.error(f"Error loading environment variables: {e}", exc_info=True)
-    raise
-
 app = FastAPI()
+
+# Mount the React build files
+app.mount("/", StaticFiles(directory="../client/build", html=True), name="static")
 
 # Add CORS middleware
 app.add_middleware(
@@ -87,8 +80,3 @@ async def chat_with_llm(request: ChatRequest):
         except Exception as e:
             logger.error(f"An unexpected error occurred: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    logger.info("Starting the server...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)

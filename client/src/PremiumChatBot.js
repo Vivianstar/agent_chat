@@ -11,6 +11,7 @@ import {
   CopyIcon,
 } from "lucide-react";
 import MapView from './MapView';
+import SpeechButton from './components/SpeechButton';
 
 const PremiumChatBotUI = () => {
   const [conversations, setConversations] = useState([
@@ -41,7 +42,7 @@ const PremiumChatBotUI = () => {
       setIsLoading(true);
 
       try {
-        const response = await fetch('http://localhost:8000/chat', {
+        const response = await fetch('/chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -277,6 +278,7 @@ const PremiumChatBotUI = () => {
               className="flex-grow px-6 py-4 bg-transparent outline-none text-gray-100 placeholder-gray-400"
               placeholder="Message ChatBot..."
             />
+            <SpeechButton onTranscript={(text) => setInputMessage(text)} />
             <button
               onClick={handleSendMessage}
               className="p-3 rounded-full text-gray-400 hover:text-purple-400 transition-colors duration-200 mr-2"

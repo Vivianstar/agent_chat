@@ -3,10 +3,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ValidationError
 import httpx
 import os
-from typing import Optional, List, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
-import json
 from fastapi.staticfiles import StaticFiles
 
 
@@ -19,24 +16,39 @@ logger = logging.getLogger(__name__)
 logger.info("Logger initialized successfully!")
 
 app = FastAPI()
+ui_app = StaticFiles(directory="client/build", html=True)
 api_app = FastAPI()
-# Mount the React build files
-app.mount("/", StaticFiles(directory="client/build", html=True), name="static")
+
+# PLEASE NOTE THE ORDER OF THE MOUNTS MATTERS
 app.mount("/api", api_app)
+app.mount("/", ui_app)
+
+origins = [
+    "http://localhost:3000",
+]
+
+# Make sure CORS is applied to both app and api_app
+# This is only needed for development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+api_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # URL for the LLM agent model endpoint
 LLM_ENDPOINT = os.getenv("AGENT_ENDPOINT")
 API_KEY = os.getenv("DATABRICKS_TOKEN")
-
-# Add CORS middleware
-api_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
 
 # Model for the request body
 class ChatRequest(BaseModel):

@@ -12,6 +12,20 @@ import {
 } from "lucide-react";
 import MapView from './MapView';
 import SpeechButton from './components/SpeechButton';
+import axios from "axios";
+
+const apiClient = axios.create({});
+
+
+// PLEASE NOTE THAT IN DEVELOPMENT MODE, THE API URL IS HARDCODED TO 
+// LOCAL URL http://localhost:6006/api
+// IN PRODUCTION, THE API URL IS RELATIVE TO THE CURRENT HOST
+if (process.env.NODE_ENV === "development") {
+  console.log("Running in development mode");
+  apiClient.defaults.baseURL = "http://localhost:6006/api";
+} else {
+  apiClient.defaults.baseURL = "/api";
+}
 
 const PremiumChatBotUI = () => {
   const [conversations, setConversations] = useState([
@@ -42,21 +56,23 @@ const PremiumChatBotUI = () => {
       setIsLoading(true);
 
       try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ message: inputMessage }),
-        });
+        const response = await apiClient.post("/chat", { message: inputMessage });
+        console.log(response.data);
+        // const response = await fetch('/api/chat', {
+        //   method: 'POST',
+        //   headers: {
+        //     'Content-Type': 'application/json',
+        //   },
+        //   body: JSON.stringify({ message: inputMessage }),
+        // });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        // if (!response.ok) {
+        //   throw new Error(`HTTP error! status: ${response.status}`);
+        // }
 
-        const data = await response.json();
-        setMessages(prevMessages => [...prevMessages, { text: data.content, sender: "bot" }]);
-        setIsLoading(false);
+        // const data = await response.json();
+        // setMessages(prevMessages => [...prevMessages, { text: data.content, sender: "bot" }]);
+        // setIsLoading(false);
       } catch (error) {
         console.error('Error:', error);
         setMessages((prevMessages) => [
@@ -93,11 +109,11 @@ const PremiumChatBotUI = () => {
 
   const extractAllCoordinates = (text) => {
     if (!text) return [];
-    
+
     // Basic regex to always capture ID and Location, make everything else optional
     const coordRegex = /Vehicle ID: (\d+)[\s\S]*?Location: (-?\d+\.?\d*),\s*(-?\d+\.?\d*)(?:[\s\S]*?Heading: (\d+))?(?:[\s\S]*?Onboard quantity: (\d+))?(?:[\s\S]*?Speed: (\d+\.?\d*))?/g;
     const vehicles = [];
-    
+
     let match;
     while ((match = coordRegex.exec(text)) !== null) {
       vehicles.push({
@@ -108,34 +124,32 @@ const PremiumChatBotUI = () => {
         speed: match[6] ? parseFloat(match[6]) : 0    // Default to 0 if no speed
       });
     }
-    
+
     console.log('Extracted vehicles:', vehicles); // Debug log
     return vehicles;
   };
 
   const renderMessage = (message, index) => {
     const vehicles = message.sender === "bot" ? extractAllCoordinates(message.text) : null;
-    
+
     return (
       <div
         key={index}
-        className={`flex ${
-          message.sender === "user" ? "justify-end" : "justify-start"
-        } animate-fadeIn`}
+        className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"
+          } animate-fadeIn`}
       >
         <div
-          className={`max-w-2xl p-4 rounded-2xl ${
-            message.sender === "user"
+          className={`max-w-2xl p-4 rounded-2xl ${message.sender === "user"
               ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white pt-3 pb-1 px-6 flex items-center"
               : "bg-gray-800 bg-opacity-50 text-gray-100"
-          } shadow-xl flex`}
+            } shadow-xl flex`}
         >
           {message.sender === "bot" && (
             <BotIcon className="w-5 h-5 mr-3 mt-1 text-purple-400" />
           )}
           <div className="markdown-content">
             <ReactMarkdown>{message.text}</ReactMarkdown>
-            
+
             {vehicles && vehicles.length > 0 && (
               <MapView vehicles={vehicles} />
             )}
@@ -211,14 +225,14 @@ const PremiumChatBotUI = () => {
     for (let i = 0; i < cities.length; i++) {
       const city = cities[i];
       await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced delay to 1 second
-      
+
       setMessages(prev => [
         ...prev,
         { sender: "user", text: city.user },
         { sender: "bot", text: city.bot }
       ]);
-      
-      
+
+
     }
   };
 

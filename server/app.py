@@ -9,17 +9,28 @@ from fastapi.responses import StreamingResponse, JSONResponse
 import json
 from fastapi.staticfiles import StaticFiles
 
+
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
+logger.info("Logger initialized successfully!")
 
 app = FastAPI()
-
+api_app = FastAPI()
 # Mount the React build files
-app.mount("/", StaticFiles(directory="../client/build", html=True), name="static")
+app.mount("/", StaticFiles(directory="client/build", html=True), name="static")
+app.mount("/api", api_app)
+
+
+# URL for the LLM agent model endpoint
+LLM_ENDPOINT = os.getenv("AGENT_ENDPOINT")
+API_KEY = os.getenv("DATABRICKS_TOKEN")
 
 # Add CORS middleware
-app.add_middleware(
+api_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
@@ -35,19 +46,8 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     content: str
 
-# URL for the LLM agent model endpoint
-LLM_ENDPOINT = os.getenv("AGENT_ENDPOINT")
-API_KEY = os.getenv("DATABRICKS_TOKEN")
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to the LLM Chat API"}
-
-@app.options("/chat")
-async def chat_options():
-    return JSONResponse(content={}, status_code=200)
-
-@app.post("/chat", response_model=ChatResponse)
+@api_app.post("/chat", response_model=ChatResponse)
 async def chat_with_llm(request: ChatRequest):
     headers = {
         "Content-Type": "application/json",
@@ -61,7 +61,7 @@ async def chat_with_llm(request: ChatRequest):
     async with httpx.AsyncClient() as client:
         try:
             logger.info(f"Sending request to LLM endpoint: {LLM_ENDPOINT}")
-            response = await client.post(LLM_ENDPOINT, json=payload, headers=headers, timeout=90.0)
+            response = await client.post(LLM_ENDPOINT, json=payload, headers=headers, timeout=500.0)
             response.raise_for_status()
             logger.info("Received response from LLM")
             response_data = response.json()

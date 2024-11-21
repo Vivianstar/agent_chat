@@ -6,10 +6,10 @@ WORKSPACE_PATH="/Workspace/Users/wenwen.xie@databricks.com/agent_app"
 
 # # Install dependencies and build if needed
 # echo "Building client..."
-# cd client
-# npm install
-# npm run build
-# cd ..
+cd client
+npm install
+npm run build
+cd ..
 
 # Create directories in workspace
 echo "Creating directories..."

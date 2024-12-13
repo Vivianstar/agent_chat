@@ -1,19 +1,45 @@
 import logging
-from fastapi import FastAPI, HTTPException, Request
+from typing import Annotated, Any
+from fastapi import Depends, FastAPI
 from pydantic import BaseModel, ValidationError
-import httpx
 import os
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import (
+    ChatMessage,
+    ChatMessageRole,
+    QueryEndpointResponse,
+)
+from dotenv import load_dotenv
+from pathlib import Path
 
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 logger.info("Logger initialized successfully!")
+
+# configure databricks sdk logger
+logging.getLogger("databricks.sdk").setLevel(logging.INFO)
+# Check and log files in the current and parent directories
+current_dir = Path.cwd()
+parent_dir = current_dir.parent
+
+logger.info(f"Current directory: {current_dir}")
+logger.info(f"Files in the current directory: {list(current_dir.iterdir())}")
+logger.info(f"Parent directory: {parent_dir}")
+logger.info(f"Files in the parent directory: {list(parent_dir.iterdir())}")
+
+load_dotenv()
+
+ENDPOINT_NAME = "agents_wenwen_xie-manufacturing-tools_agent_demo"
+
+if not ENDPOINT_NAME:
+    logger.error("SERVING_ENDPOINT_NAME environment variable is not set")
+    raise ValueError("SERVING_ENDPOINT_NAME environment variable is not set")
 
 app = FastAPI()
 ui_app = StaticFiles(directory="client/build", html=True)
@@ -46,13 +72,15 @@ api_app.add_middleware(
 )
 
 
-# URL for the LLM agent model endpoint
-LLM_ENDPOINT = os.getenv("AGENT_ENDPOINT")
-API_KEY = os.getenv("DATABRICKS_TOKEN")
+# client
+def client():
+    return WorkspaceClient()
+
 
 # Model for the request body
 class ChatRequest(BaseModel):
     message: str
+
 
 # Simplified response model
 class ChatResponse(BaseModel):
@@ -60,35 +88,12 @@ class ChatResponse(BaseModel):
 
 
 @api_app.post("/chat", response_model=ChatResponse)
-async def chat_with_llm(request: ChatRequest):
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {API_KEY}"
-    }
-    logger.info(f"Received message: {request.message}")
-    payload = {
-        "messages": [{"role": "user", "content": request.message}]
-    }
-    logger.info(f"Payload: {payload}")
-    async with httpx.AsyncClient() as client:
-        try:
-            logger.info(f"Sending request to LLM endpoint: {LLM_ENDPOINT}")
-            response = await client.post(LLM_ENDPOINT, json=payload, headers=headers, timeout=500.0)
-            response.raise_for_status()
-            logger.info("Received response from LLM")
-            response_data = response.json()
-            logger.info(f"Response data: {response_data}")
-            try:
-                # Extract content from the first choice's message
-                content = response_data[0]['choices'][0]['message']['content']
-                return ChatResponse(content=content)
-            except (KeyError, IndexError, ValidationError) as e:
-                logger.error(f"Failed to process response: {e}")
-                raise HTTPException(status_code=500, detail="Invalid response from LLM endpoint")
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error occurred: {e}")
-            logger.error(f"Response content: {e.response.content}")
-            raise HTTPException(status_code=e.response.status_code, detail=str(e))
-        except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=str(e))
+def chat_with_llm(
+    request: ChatRequest, client: Annotated[WorkspaceClient, Depends(client)]
+):
+    response = client.serving_endpoints.query(
+        ENDPOINT_NAME,
+        messages=[ChatMessage(content=request.message, role=ChatMessageRole.USER)],
+    )
+    return ChatResponse(content=response.choices[0].message.content)
+    

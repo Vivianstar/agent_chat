@@ -23,20 +23,14 @@ logger = logging.getLogger(__name__)
 logger.info("Logger initialized successfully!")
 
 # configure databricks sdk logger
-logging.getLogger("databricks.sdk").setLevel(logging.DEBUG)
 
+logging.getLogger("databricks.sdk").setLevel(logging.INFO)
+# Check and log files in the current and parent directories
+current_dir = Path.cwd()
+parent_dir = current_dir.parent
 
-# Load environment variables from .env file
-dotenv_file = Path(__file__).parent / ".env"
-if dotenv_file.exists():
-    logger.info("Loading environment variables from .env file")
-    load_dotenv(dotenv_path=dotenv_file)
+load_dotenv()
 
-else:
-    logger.info("No .env file found, skipping loading environment variables from it")
-
-
-# verify that LLM_ENDPOINT is set
 ENDPOINT_NAME = os.environ.get("SERVING_ENDPOINT_NAME")
 
 if not ENDPOINT_NAME:
@@ -93,16 +87,10 @@ class ChatResponse(BaseModel):
 def chat_with_llm(
     request: ChatRequest, client: Annotated[WorkspaceClient, Depends(client)]
 ):
-    raw_response: list[dict[str, Any]] = client.api_client.do(
-        "POST",
-        f"/serving-endpoints/{ENDPOINT_NAME}/invocations",
-        body={
-            "messages": [
-                ChatMessage(
-                    content=request.message, role=ChatMessageRole.USER
-                ).as_dict()
-            ]
-        },
+    response = client.serving_endpoints.query(
+        ENDPOINT_NAME,
+        messages=[ChatMessage(content=request.message, role=ChatMessageRole.USER)],
     )
-    response = [QueryEndpointResponse.from_dict(payload) for payload in raw_response]
-    return ChatResponse(content=response[0].choices[0].message.content)
+    return ChatResponse(content=response.choices[0].message.content)
+    
+

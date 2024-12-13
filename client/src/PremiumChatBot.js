@@ -57,22 +57,8 @@ const PremiumChatBotUI = () => {
 
       try {
         const response = await apiClient.post("/chat", { message: inputMessage });
-        console.log(response.data);
-        // const response = await fetch('/api/chat', {
-        //   method: 'POST',
-        //   headers: {
-        //     'Content-Type': 'application/json',
-        //   },
-        //   body: JSON.stringify({ message: inputMessage }),
-        // });
-
-        // if (!response.ok) {
-        //   throw new Error(`HTTP error! status: ${response.status}`);
-        // }
-
-        // const data = await response.json();
-        // setMessages(prevMessages => [...prevMessages, { text: data.content, sender: "bot" }]);
-        // setIsLoading(false);
+        setMessages(prevMessages => [...prevMessages, { text: response.data.content, sender: "bot" }]);
+        setIsLoading(false);
       } catch (error) {
         console.error('Error:', error);
         setMessages((prevMessages) => [

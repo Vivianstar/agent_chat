@@ -23,19 +23,15 @@ logger = logging.getLogger(__name__)
 logger.info("Logger initialized successfully!")
 
 # configure databricks sdk logger
+
 logging.getLogger("databricks.sdk").setLevel(logging.INFO)
 # Check and log files in the current and parent directories
 current_dir = Path.cwd()
 parent_dir = current_dir.parent
 
-logger.info(f"Current directory: {current_dir}")
-logger.info(f"Files in the current directory: {list(current_dir.iterdir())}")
-logger.info(f"Parent directory: {parent_dir}")
-logger.info(f"Files in the parent directory: {list(parent_dir.iterdir())}")
-
 load_dotenv()
 
-ENDPOINT_NAME = "agents_wenwen_xie-manufacturing-tools_agent_demo"
+ENDPOINT_NAME = os.environ.get("SERVING_ENDPOINT_NAME")
 
 if not ENDPOINT_NAME:
     logger.error("SERVING_ENDPOINT_NAME environment variable is not set")
@@ -97,3 +93,4 @@ def chat_with_llm(
     )
     return ChatResponse(content=response.choices[0].message.content)
     
+

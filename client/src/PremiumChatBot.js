@@ -22,7 +22,7 @@ const apiClient = axios.create({});
 // IN PRODUCTION, THE API URL IS RELATIVE TO THE CURRENT HOST
 if (process.env.NODE_ENV === "development") {
   console.log("Running in development mode");
-  apiClient.defaults.baseURL = "http://localhost:6006/api";
+  apiClient.defaults.baseURL = "http://localhost:8000/api";
 } else {
   apiClient.defaults.baseURL = "/api";
 }
@@ -30,9 +30,9 @@ if (process.env.NODE_ENV === "development") {
 const PremiumChatBotUI = () => {
   const [conversations, setConversations] = useState([
     { id: 1, title: "New Conversation" },
-    { id: 2, title: "Professional Bio Summary" },
-    { id: 3, title: "Create a travel plan" },
-    { id: 4, title: "Recommend a great book" },
+    { id: 2, title: "Bottleneck Analysis" },
+    { id: 3, title: "Inventory Management" },
+    { id: 4, title: "Supply Chain Optimization" },
   ]);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -57,7 +57,10 @@ const PremiumChatBotUI = () => {
 
       try {
         const response = await apiClient.post("/chat", { message: inputMessage });
-        setMessages(prevMessages => [...prevMessages, { text: response.data.content, sender: "bot" }]);
+        setMessages(prevMessages => [...prevMessages, { 
+          text: response.data.content || String(response.data),
+          sender: "bot" 
+        }]);
         setIsLoading(false);
       } catch (error) {
         console.error('Error:', error);
@@ -274,7 +277,7 @@ const PremiumChatBotUI = () => {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
               className="flex-grow px-6 py-4 bg-transparent outline-none text-gray-100 placeholder-gray-400"
               placeholder="Message ChatBot..."
             />

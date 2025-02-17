@@ -1,70 +1,134 @@
-# Getting Started with Create React App
+# AI Chat Application
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+![Chat Interface](./client/public/chat-interface.png)
+_AI Chat Interface with real-time responses_
 
-## Available Scripts
+## Overview
 
-In the project directory, you can run:
+This app is a full-stack application featuring a chat interface powered by LLM, built with React and FastAPI.
 
-### `npm start`
+### Key Features
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- 🤖 AI-powered chat interface
+- 🎨 Modern UI with Tailwind CSS
+- 🔄 Real-time response handling
+- 🌐 FastAPI backend with async support
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Prerequisites
 
-### `npm test`
+- Python 3.8+
+- Node.js 18.x+
+- npm or yarn
+- A Databricks workspace (for AI model serving)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Environment Setup
 
-### `npm run build`
+1. Clone the repository:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+git clone <repository-url>
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+2. Create and activate a Python virtual environment:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+```
 
-### `npm run eject`
+3. Install Python dependencies:
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+pip install -r requirements.txt
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Building the Frontend
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+1. Navigate to the client directory:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```bash
+cd client
+```
 
-## Learn More
+2. Install dependencies:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+npm install
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+3. Build the production version:
 
-### Code Splitting
+```bash
+npm run build
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Running the Application
 
-### Analyzing the Bundle Size
+1. For development with hot-reload:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```bash
+# Terminal 1 - Frontend
+cd client
+npm start
 
-### Making a Progressive Web App
+# Terminal 2 - Backend
+gunicorn server.app:app -w 2 --worker-class uvicorn.workers.UvicornWorker
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+2. For production:
 
-### Advanced Configuration
+```bash
+gunicorn server.app:app -w 2 --worker-class uvicorn.workers.UvicornWorker
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+3. For Databricks Apps deployment:
 
-### Deployment
+   a. Install the Databricks CLI:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+   ```bash
+   brew install databricks
+   ```
 
-### `npm run build` fails to minify
+   b. Create the app in your workspace:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+   ```bash
+   databricks apps create chat-app
+   ```
+
+   c. Create an `app.yaml` file in the root directory:
+
+   ```yaml
+   command:
+   - "gunicorn"
+   - "server.app:app"
+   - "-w"
+   - "2"
+   - "--worker-class"
+   - "uvicorn.workers.UvicornWorker"
+
+   env:
+   - name: "SERVING_ENDPOINT_NAME"
+       valueFrom: "agent_MODEL_NAME_FQN"
+   ```
+
+   The `app.yaml` configuration uses gunicorn as the WSGI server to run your FastAPI application.
+   The environment section defines `SERVING_ENDPOINT_NAME` which is configured (`serving_endpoint`) through apps creation in Databricks, securly storing and accessing sensitive values.
+
+   For detials on how to create an app in Databricks, please refer to the [Databricks Apps Documentation](https://docs.databricks.com/en/dev-tools/databricks-apps/configuration.html).
+
+   d. Sync your local files to Databricks workspace:
+
+   ```bash
+   # Add node_modules/ and venv/ to .gitignore first if not already present
+   databricks sync --watch . /Workspace/Users/<your-email>/chat-app
+   ```
+
+   e. Deploy the app:
+
+   ```bash
+   databricks apps deploy chat-app --source-code-path /Workspace/Users/<your-email>/chat-app
+   ```
+
+   The application will be available at your Databricks Apps URL:
+
+   - Production URL: https://chat-app-[id].cloud.databricksapps.com

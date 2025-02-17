@@ -9,11 +9,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.serving import (
     ChatMessage,
     ChatMessageRole,
-    QueryEndpointResponse,
 )
 from dotenv import load_dotenv
-from pathlib import Path
-
 
 # Set up logging
 logging.basicConfig(
@@ -22,16 +19,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info("Logger initialized successfully!")
 
-# configure databricks sdk logger
-
-logging.getLogger("databricks.sdk").setLevel(logging.INFO)
-# Check and log files in the current and parent directories
-current_dir = Path.cwd()
-parent_dir = current_dir.parent
-
 load_dotenv()
 
-ENDPOINT_NAME = os.environ.get("SERVING_ENDPOINT_NAME")
+ENDPOINT_NAME = os.getenv("SERVING_ENDPOINT_NAME")
 
 if not ENDPOINT_NAME:
     logger.error("SERVING_ENDPOINT_NAME environment variable is not set")

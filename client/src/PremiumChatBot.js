@@ -10,29 +10,13 @@ import {
   ThumbsDownIcon,
   CopyIcon,
 } from "lucide-react";
-import MapView from './MapView';
-import SpeechButton from './components/SpeechButton';
-import axios from "axios";
-
-const apiClient = axios.create({});
-
-
-// PLEASE NOTE THAT IN DEVELOPMENT MODE, THE API URL IS HARDCODED TO 
-// LOCAL URL http://localhost:6006/api
-// IN PRODUCTION, THE API URL IS RELATIVE TO THE CURRENT HOST
-if (process.env.NODE_ENV === "development") {
-  console.log("Running in development mode");
-  apiClient.defaults.baseURL = "http://localhost:8000/api";
-} else {
-  apiClient.defaults.baseURL = "/api";
-}
 
 const PremiumChatBotUI = () => {
   const [conversations, setConversations] = useState([
     { id: 1, title: "New Conversation" },
-    { id: 2, title: "Bottleneck Analysis" },
-    { id: 3, title: "Inventory Management" },
-    { id: 4, title: "Supply Chain Optimization" },
+    { id: 2, title: "Professional Bio Summary" },
+    { id: 3, title: "Create a travel plan" },
+    { id: 4, title: "Recommend a great book" },
   ]);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -40,8 +24,6 @@ const PremiumChatBotUI = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState({});
   const initialized = useRef(false);
-  const vehicleIntervals = useRef([]);
-  const [currentLocation, setCurrentLocation] = useState([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -56,11 +38,20 @@ const PremiumChatBotUI = () => {
       setIsLoading(true);
 
       try {
-        const response = await apiClient.post("/chat", { message: inputMessage });
-        setMessages(prevMessages => [...prevMessages, { 
-          text: response.data.content || String(response.data),
-          sender: "bot" 
-        }]);
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: inputMessage }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setMessages(prevMessages => [...prevMessages, { text: data.content, sender: "bot" }]);
         setIsLoading(false);
       } catch (error) {
         console.error('Error:', error);
@@ -75,8 +66,6 @@ const PremiumChatBotUI = () => {
       }
     }
   };
-
-
 
   const handleFeedback = (messageIndex, isPositive) => {
     setFeedback(prev => ({
@@ -96,53 +85,27 @@ const PremiumChatBotUI = () => {
     });
   };
 
-  const extractAllCoordinates = (text) => {
-    if (!text) return [];
-
-    // Basic regex to always capture ID and Location, make everything else optional
-    const coordRegex = /Vehicle ID: (\d+)[\s\S]*?Location: (-?\d+\.?\d*),\s*(-?\d+\.?\d*)(?:[\s\S]*?Heading: (\d+))?(?:[\s\S]*?Onboard quantity: (\d+))?(?:[\s\S]*?Speed: (\d+\.?\d*))?/g;
-    const vehicles = [];
-
-    let match;
-    while ((match = coordRegex.exec(text)) !== null) {
-      vehicles.push({
-        id: match[1],
-        location: [parseFloat(match[2]), parseFloat(match[3])],
-        heading: match[4] ? parseInt(match[4]) : 0,   // Default to 0 if no heading
-        onboardQuantity: match[5] ? parseInt(match[5]) : 0,  // Default to 0 if no quantity
-        speed: match[6] ? parseFloat(match[6]) : 0    // Default to 0 if no speed
-      });
-    }
-
-    console.log('Extracted vehicles:', vehicles); // Debug log
-    return vehicles;
-  };
-
   const renderMessage = (message, index) => {
-    const vehicles = message.sender === "bot" ? extractAllCoordinates(message.text) : null;
-
     return (
       <div
         key={index}
-        className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"
-          } animate-fadeIn`}
+        className={`flex ${
+          message.sender === "user" ? "justify-end" : "justify-start"
+        } animate-fadeIn`}
       >
         <div
-          className={`max-w-2xl p-4 rounded-2xl ${message.sender === "user"
+          className={`max-w-2xl p-4 rounded-2xl ${
+            message.sender === "user"
               ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white pt-3 pb-1 px-6 flex items-center"
               : "bg-gray-800 bg-opacity-50 text-gray-100"
-            } shadow-xl flex`}
+          } shadow-xl flex`}
         >
           {message.sender === "bot" && (
             <BotIcon className="w-5 h-5 mr-3 mt-1 text-purple-400" />
           )}
           <div className="markdown-content">
             <ReactMarkdown>{message.text}</ReactMarkdown>
-
-            {vehicles && vehicles.length > 0 && (
-              <MapView vehicles={vehicles} />
-            )}
-
+            
             {message.sender === "bot" && (
               <div className="mt-2 flex justify-end space-x-2">
                 <button
@@ -174,54 +137,32 @@ const PremiumChatBotUI = () => {
 
   // Function to add messages with delay and simulate movement
   const initializeMessages = async () => {
-    // Define cities with their coordinates
     const cities = [
       {
-        user: "Find me the vehicle statuses within 5 miles of location 1669 Euclid Ave, Boulder, CO 80309",
-        bot: `Here are the vehicle statuses within 5 miles of 1669 Euclid Ave, Boulder, CO 80309:
-
-              1. Vehicle ID: 100905
-                - Location: 40.00666427612305, -105.28015899658203
-                - Heading: 226
-                - Onboard quantity: 1000
-                - Speed: 11.384
-                - Last reported timestamp: 2024-10-01T09:35:18.000Z
-
-              2. Vehicle ID: 100258
-                - Location: 40.04490661621094, -105.26258850097656
-                - Heading: 166
-                - Onboard quantity: 1364
-                - Speed: 7.3385
-                - Last reported timestamp: 2024-10-01T09:39:21.000Z
-
-              3. Vehicle ID: 100492
-                - Location: 40.04677200317383, -105.26612854003906
-                - Heading: 302
-                - Onboard quantity: 967
-                - Speed: 25.5408
-                - Last reported timestamp: 2024-10-01T09:39:11.000Z
-
-              4. Vehicle ID: 100401
-                - Location: 40.04257781982422, -105.2877133178711
-                - Heading: 266
-                - Onboard quantity: 809
-                - Speed: 34.6396
-                - Last reported timestamp: 2024-10-01T09:05:52.000Z`
+        user: "What's the difference between let and const in JavaScript?",
+        bot: "Here's a simple explanation:\n\n" +
+             "- `let` allows you to reassign values\n" +
+             "- `const` prevents reassignment\n\n" +
+             "Example:\n" +
+             "```javascript\n" +
+             "let count = 1;\n" +
+             "count = 2; // ✅ This works\n\n" +
+             "const API_KEY = '123';\n" +
+             "API_KEY = '456'; // ❌ This throws an error\n" +
+             "```"
       }
     ];
 
     // Add each city with a delay
     for (let i = 0; i < cities.length; i++) {
       const city = cities[i];
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced delay to 1 second
-
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       setMessages(prev => [
         ...prev,
         { sender: "user", text: city.user },
         { sender: "bot", text: city.bot }
       ]);
-
-
     }
   };
 
@@ -277,11 +218,10 @@ const PremiumChatBotUI = () => {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
               className="flex-grow px-6 py-4 bg-transparent outline-none text-gray-100 placeholder-gray-400"
               placeholder="Message ChatBot..."
             />
-            <SpeechButton onTranscript={(text) => setInputMessage(text)} />
             <button
               onClick={handleSendMessage}
               className="p-3 rounded-full text-gray-400 hover:text-purple-400 transition-colors duration-200 mr-2"

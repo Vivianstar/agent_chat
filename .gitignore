@@ -97,3 +97,4 @@ client/node_modules/
 .databricks
 
 .build
+deploy.sh
